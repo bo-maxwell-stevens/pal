@@ -172,6 +172,15 @@ def _scatter_with_fit(ax, d: pd.DataFrame, x: str, y: str, label: str) -> tuple[
     return len(dd), model.rsquared, float(model.pvalues[x])
 
 
+def _to_unit_proportion(s: pd.Series) -> pd.Series:
+    x = pd.to_numeric(s, errors="coerce")
+    if x.dropna().empty:
+        return x
+    if x.max() > 1.0:
+        x = x / 100.0
+    return x
+
+
 def fig5_richness_vs_traits(master: pd.DataFrame, out_base: Path) -> None:
     traits = ["root_diameter_mean", "SRL_mean", "RTD_mean", "root_N_mean", "root_P_mean"]
     fig, axs = plt.subplots(2, 3, figsize=(14, 8))
@@ -214,7 +223,8 @@ def fig6_guilds_vs_traits(master: pd.DataFrame, out_base: Path) -> None:
                 ax.set_axis_off()
                 continue
             n = len(dd)
-            p_adj = (dd[g] * (n - 1) + 0.5) / n
+            p = _to_unit_proportion(dd[g])
+            p_adj = (p * (n - 1) + 0.5) / n
             dd["logit"] = np.log(p_adj.clip(1e-6, 1 - 1e-6) / (1 - p_adj.clip(1e-6, 1 - 1e-6)))
             nn, r2, p = _scatter_with_fit(ax, dd.rename(columns={"logit": g + "_logit"}), t, g + "_logit", "")
             ax.set_title(f"{g.split('_')[-2]} vs {t}", fontsize=9)
@@ -238,7 +248,8 @@ def fig7_woody_sensitivity(master: pd.DataFrame, out_base: Path) -> None:
                 data = dd[[t, col]].dropna().copy()
                 if resp.endswith("prop_rhizophilic_mean") and len(data):
                     n = len(data)
-                    p_adj = (data[col] * (n - 1) + 0.5) / n
+                    p = _to_unit_proportion(data[col])
+                    p_adj = (p * (n - 1) + 0.5) / n
                     data[col] = np.log(p_adj.clip(1e-6, 1 - 1e-6) / (1 - p_adj.clip(1e-6, 1 - 1e-6)))
                 _scatter_with_fit(ax, data, t, col, g)
             short = "AMF richness" if "richness" in resp else "rhizophilic proportion"
