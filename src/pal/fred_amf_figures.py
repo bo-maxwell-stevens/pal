@@ -4,6 +4,7 @@ import string
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -237,7 +238,10 @@ def fig6_guilds_vs_traits(master: pd.DataFrame, out_base: Path) -> None:
 
 def fig7_woody_sensitivity(master: pd.DataFrame, out_base: Path) -> None:
     d = master.copy()
-    d["group"] = np.where(d.get("woodiness", "").astype(str).str.lower().str.contains("wood"), "woody", "non_woody")
+    w = d.get("woodiness", "").astype(str).str.lower()
+    is_non_woody = w.str.contains("non-woody") | w.str.contains("herb")
+    is_woody = (w.str.contains("woody") & ~is_non_woody) | w.str.fullmatch("woody")
+    d["group"] = np.where(is_non_woody, "non_woody", np.where(is_woody, "woody", "non_woody"))
     traits = ["root_diameter_mean", "RTD_mean", "root_N_mean"]
     fig, axs = plt.subplots(2, len(traits), figsize=(14, 7))
     for r, resp in enumerate(["EcoBank_amf_richness_mean", "EcoBank_prop_rhizophilic_mean"]):
@@ -268,14 +272,29 @@ def fig8_genus_sensitivity(genus_master: pd.DataFrame, out_base: Path) -> None:
         if t in genus_master.columns and "EcoBank_amf_richness_mean" in genus_master.columns:
             d = genus_master[[t, "EcoBank_amf_richness_mean", "n_species"]].dropna()
             if len(d):
-                ax.scatter(d[t], d["EcoBank_amf_richness_mean"], s=10 + d["n_species"] * 2, alpha=0.5, label="Genus")
+                sc = ax.scatter(
+                    d[t],
+                    d["EcoBank_amf_richness_mean"],
+                    s=10 + d["n_species"] * 2,
+                    c=d["n_species"],
+                    cmap="viridis",
+                    alpha=0.6,
+                    label="Genus"
+                )
                 n, r2, p = _scatter_with_fit(ax, d, t, "EcoBank_amf_richness_mean", "")
                 ax.text(0.03, 0.97, f"n={n}, R2={r2:.2f}, p={p:.3g}", transform=ax.transAxes, va="top", fontsize=8)
+                cbar = fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
+                cbar.set_label("Species per genus", fontsize=8)
             ax.set_title(f"Genus richness vs {t}")
             ax.set_xlabel(t)
             ax.set_ylabel("Genus-level AMF richness")
-            handles, labels = ax.get_legend_handles_labels()
-            if handles:
-                ax.legend(frameon=False, loc="best")
+            if len(d):
+                size_vals = [5, 15, 30]
+                size_handles = [
+                    plt.scatter([], [], s=10 + v * 2, color="gray", alpha=0.6, label=f"size={v}")
+                    for v in size_vals
+                ]
+                line_handle = Line2D([0], [0], color="black", lw=1.5, label="OLS fit")
+                ax.legend(handles=size_handles + [line_handle], frameon=False, loc="best", title="Legend")
     _panel_labels(axs)
     save_png(fig, out_base)
