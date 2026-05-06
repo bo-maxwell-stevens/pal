@@ -268,11 +268,14 @@ def fig8_genus_sensitivity(genus_master: pd.DataFrame, out_base: Path) -> None:
         if t in genus_master.columns and "EcoBank_amf_richness_mean" in genus_master.columns:
             d = genus_master[[t, "EcoBank_amf_richness_mean", "n_species"]].dropna()
             if len(d):
-                ax.scatter(d[t], d["EcoBank_amf_richness_mean"], s=10 + d["n_species"] * 2, alpha=0.5)
+                ax.scatter(d[t], d["EcoBank_amf_richness_mean"], s=10 + d["n_species"] * 2, alpha=0.5, label="Genus")
                 n, r2, p = _scatter_with_fit(ax, d, t, "EcoBank_amf_richness_mean", "")
                 ax.text(0.03, 0.97, f"n={n}, R2={r2:.2f}, p={p:.3g}", transform=ax.transAxes, va="top", fontsize=8)
             ax.set_title(f"Genus richness vs {t}")
             ax.set_xlabel(t)
             ax.set_ylabel("Genus-level AMF richness")
+            handles, labels = ax.get_legend_handles_labels()
+            if handles:
+                ax.legend(frameon=False, loc="best")
     _panel_labels(axs)
     save_png(fig, out_base)
