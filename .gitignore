@@ -5,7 +5,10 @@ __pycache__/
 Data/
 
 # Large analysis outputs (keep docs tracked)
-Output/Figures/
+Output/Figures/*.png
+Output/Figures/*.pdf
+!Output/Figures/Fig*.png
+!Output/Figures/Fig*.pdf
 Output/*.png
 Output/*.jpg
 Output/*.zip
