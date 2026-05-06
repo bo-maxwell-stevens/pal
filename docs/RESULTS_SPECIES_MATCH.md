@@ -8,14 +8,14 @@ This document compares species matching between plant datasets and available FRE
 
 | dataset | fred_source | dataset_species | fred_species | exact_matches | match_percent |
 |---|---|---:|---:|---:|---:|
-| EcoBank | FRED_4_full_20260312_2.csv | 529 | 7005 | 153 | 28.92 |
-| EcoBank | FRED3_fineRoots.csv | 529 | 204 | 83 | 15.69 |
-| EcoBank | FRED_4_20250921_filteredforMicrobeNet_AMF_FineRootsLess2mm.csv | 529 | 992 | 37 | 6.99 |
-| EcoBank | FRED_4_20250921_filteredforMicrobeNet_AMF_1stOrderRoots.csv | 529 | 558 | 11 | 2.08 |
-| GlobalAMFungi | FRED_4_full_20260312_2.csv | 285 | 7005 | 112 | 39.30 |
-| GlobalAMFungi | FRED3_fineRoots.csv | 285 | 204 | 65 | 22.81 |
-| GlobalAMFungi | FRED_4_20250921_filteredforMicrobeNet_AMF_FineRootsLess2mm.csv | 285 | 992 | 45 | 15.79 |
-| GlobalAMFungi | FRED_4_20250921_filteredforMicrobeNet_AMF_1stOrderRoots.csv | 285 | 558 | 18 | 6.32 |
+| EcoBank | FRED4_full | 500 | 6307 | 160 | 32.00 |
+| EcoBank | FRED3 | 500 | 176 | 89 | 17.80 |
+| EcoBank | FRED4_filtered_fineroot_lt2mm | 500 | 896 | 41 | 8.20 |
+| EcoBank | FRED4_filtered_1storder | 500 | 535 | 13 | 2.60 |
+| GlobalAMFungi | FRED4_full | 275 | 6307 | 121 | 44.00 |
+| GlobalAMFungi | FRED3 | 275 | 176 | 68 | 24.73 |
+| GlobalAMFungi | FRED4_filtered_fineroot_lt2mm | 275 | 896 | 46 | 16.73 |
+| GlobalAMFungi | FRED4_filtered_1storder | 275 | 535 | 19 | 6.91 |
 
 ## Interpretation
 

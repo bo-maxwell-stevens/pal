@@ -1,0 +1,9 @@
+dataset,fred_source,n_dataset_species,n_fred_species,exact_matches,match_percent,genus_overlap
+EcoBank,FRED3,500,176,89,17.8,89
+GlobalAMFungi,FRED3,275,176,68,24.727272727272727,76
+EcoBank,FRED4_filtered_fineroot_lt2mm,500,896,41,8.2,112
+GlobalAMFungi,FRED4_filtered_fineroot_lt2mm,275,896,46,16.727272727272727,95
+EcoBank,FRED4_filtered_1storder,500,535,13,2.6,47
+GlobalAMFungi,FRED4_filtered_1storder,275,535,19,6.909090909090909,44
+EcoBank,FRED4_full,500,6307,160,32.0,224
+GlobalAMFungi,FRED4_full,275,6307,121,44.0,165

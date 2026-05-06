@@ -24,6 +24,21 @@ Outputs:
 - `Output/fred_species_likely_matches.csv`
 - `Output/fred_species_match_report.md`
 
+## Run full FRED4-primary analysis
+
+```bash
+PYTHONPATH=src /home/stevens/miniconda3/bin/python scripts/run_fred4_amf_analysis.py
+```
+
+Primary outputs:
+- `Output/Tables/fred_amf_species_overlap_summary.csv`
+- `Output/Tables/fred4_amf_species_master_table.csv`
+- `Output/Tables/fred4_amf_genus_master_table.csv`
+- `Output/Tables/species_level_model_summaries.csv`
+- `Output/Tables/genus_level_model_summaries.csv`
+- `Output/Figures/Fig1_...` through `Fig8_...` in PNG and PDF
+- `Output/Reports/fred_amf_next_analysis_report.md`
+
 ## Notes
 
 - No download step is required for this comparison.

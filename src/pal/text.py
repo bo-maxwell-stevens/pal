@@ -16,6 +16,27 @@ def canonicalize_species(value: object) -> Optional[str]:
 
 
 def genus_of(species_name: Optional[str]) -> Optional[str]:
-    if not species_name:
+    if species_name is None:
         return None
-    return species_name.split(" ", 1)[0]
+    s = str(species_name).strip()
+    if not s or s.lower() in {"nan", "none"}:
+        return None
+    return s.split(" ", 1)[0]
+
+
+def canonical_binomial(value: object) -> Optional[str]:
+    s = canonicalize_species(value)
+    if not s:
+        return None
+    tokens = [t for t in s.split(" ") if t]
+    if len(tokens) < 2:
+        return None
+    genus, epithet = tokens[0], tokens[1]
+    bad = {"sp", "sp.", "spp", "cf", "cf.", "aff", "aff.", "x", "hybrid"}
+    if epithet in bad:
+        return None
+    if not re.match(r"^[a-z-]+$", genus):
+        return None
+    if not re.match(r"^[a-z-]+$", epithet):
+        return None
+    return f"{genus} {epithet}"
