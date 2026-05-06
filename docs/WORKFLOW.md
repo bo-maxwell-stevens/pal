@@ -2,13 +2,13 @@
 
 ## Goal
 
-Run species-match analysis repeatedly without re-downloading source data.
+Provide a reproducible, collaborator-friendly FRED x AMF analysis using full FRED4 as primary input.
 
 ## One-time setup
 
 - Ensure Python environment has `pandas` (current tested binary: `/home/stevens/miniconda3/bin/python`).
 
-## Repeated run
+## Quick run
 
 ```bash
 PYTHONPATH=src /home/stevens/miniconda3/bin/python scripts/compare_fred_sources.py
@@ -32,6 +32,13 @@ This generates:
 - multi-panel figures `Fig1` to `Fig8` in PNG,
 - report: `Output/Reports/fred_amf_next_analysis_report.md`,
 - figure trends summary: `Output/Reports/fred_amf_figure_trends_summary.md`.
+
+## Collaboration docs
+
+- `docs/COLLABORATOR_GUIDE.md`
+- `docs/RESULTS_SPECIES_MATCH.md`
+- `Output/Reports/fred_amf_next_analysis_report.md`
+- `Output/Reports/fred_amf_figure_trends_summary.md`
 
 ## Current interpretation status
 

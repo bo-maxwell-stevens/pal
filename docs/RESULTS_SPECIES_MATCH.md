@@ -4,6 +4,10 @@ Run date: 2026-05-06
 
 This document compares species matching between plant datasets and available FRED sources, including the new full file `Data/FRED_4_full_20260312_2.csv`.
 
+For broader context and downstream interpretation, see:
+- `docs/COLLABORATOR_GUIDE.md`
+- `Output/Reports/fred_amf_next_analysis_report.md`
+
 ## Exact canonical match counts
 
 | dataset | fred_source | dataset_species | fred_species | exact_matches | match_percent |
