@@ -21,14 +21,14 @@
 - Genus master rows: 2,204
 
 ## Figure list
-- Fig1_dataset_overlap_summary.(png,pdf)
-- Fig2_geographic_coverage.(png,pdf)
-- Fig3_root_trait_distributions.(png,pdf)
-- Fig4_root_economics_pca.(png,pdf)
-- Fig5_species_amf_richness_vs_root_traits.(png,pdf)
-- Fig6_amf_guild_proportions_vs_root_traits.(png,pdf)
-- Fig7_woody_herbaceous_sensitivity.(png,pdf)
-- Fig8_genus_level_sensitivity.(png,pdf)
+- Fig1_dataset_overlap_summary.png
+- Fig2_geographic_coverage.png
+- Fig3_root_trait_distributions.png
+- Fig4_root_economics_pca.png
+- Fig5_species_amf_richness_vs_root_traits.png
+- Fig6_amf_guild_proportions_vs_root_traits.png
+- Fig7_woody_herbaceous_sensitivity.png
+- Fig8_genus_level_sensitivity.png
 
 ## Main preliminary statistical results
 - Species-level models: `/home/stevens/projects/pal/Output/Tables/species_level_model_summaries.csv`

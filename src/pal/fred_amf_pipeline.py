@@ -82,6 +82,9 @@ def load_globalamf(root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     if not fp.exists():
         fp = root / "Output/globalamfungi_sample_level.csv"
     g = pd.read_csv(fp)
+    sample_col = "id" if "id" in g.columns else ("sample_id" if "sample_id" in g.columns else None)
+    if sample_col is None:
+        raise ValueError("GlobalAMFungi sample-level file missing id/sample_id column")
     g["canonical_species"] = _apply_corrections(g.get("plant_species"))
     g = g[g["canonical_species"].notna()].copy()
     for c in ["amf_seq_richness", "amf_genus_richness", "latitude", "longitude"]:
@@ -90,7 +93,7 @@ def load_globalamf(root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     species = (
         g.groupby("canonical_species", as_index=False)
         .agg(
-            GlobalAMFungi_n_samples=("id", "nunique"),
+            GlobalAMFungi_n_samples=(sample_col, "nunique"),
             GlobalAMFungi_amf_richness_mean=("amf_seq_richness", "mean"),
             GlobalAMFungi_amf_genus_richness_mean=("amf_genus_richness", "mean"),
             GlobalAMFungi_latitude_mean=("latitude", "mean"),

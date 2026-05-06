@@ -14,10 +14,9 @@ def _panel_labels(axs):
         ax.text(0.01, 0.99, string.ascii_uppercase[i], transform=ax.transAxes, va="top", ha="left", fontweight="bold")
 
 
-def save_png_pdf(fig, base: Path) -> None:
+def save_png(fig, base: Path) -> None:
     fig.tight_layout()
     fig.savefig(base.with_suffix(".png"), dpi=300)
-    fig.savefig(base.with_suffix(".pdf"))
     plt.close(fig)
 
 
@@ -41,7 +40,7 @@ def fig1_overlap(summary: pd.DataFrame, out_base: Path) -> None:
         ax.set_title(title)
     axs[0].legend(frameon=False)
     _panel_labels(axs)
-    save_png_pdf(fig, out_base)
+    save_png(fig, out_base)
 
 
 def fig2_geo(fred4: pd.DataFrame, eco_sample: pd.DataFrame, glo_sample: pd.DataFrame, out_base: Path) -> None:
@@ -73,7 +72,7 @@ def fig2_geo(fred4: pd.DataFrame, eco_sample: pd.DataFrame, glo_sample: pd.DataF
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
     _panel_labels(axs)
-    save_png_pdf(fig, out_base)
+    save_png(fig, out_base)
 
 
 def fig3_trait_distributions(master: pd.DataFrame, out_base: Path) -> None:
@@ -98,20 +97,50 @@ def fig3_trait_distributions(master: pd.DataFrame, out_base: Path) -> None:
         axs.ravel()[j].axis("off")
     axs.ravel()[0].legend(frameon=False)
     _panel_labels(axs)
-    save_png_pdf(fig, out_base)
+    save_png(fig, out_base)
 
 
 def fig4_pca(master: pd.DataFrame, out_base: Path) -> None:
     d = master.dropna(subset=["PC1", "PC2"]).copy()
     fig, axs = plt.subplots(2, 2, figsize=(12, 9))
 
+    traits = ["root_diameter_mean", "SRL_mean", "RTD_mean", "root_N_mean"]
+    complete = master[traits].dropna()
+    evr1 = np.nan
+    evr2 = np.nan
+    loadings = None
+    if len(complete) >= 5:
+        X = (complete - complete.mean()) / complete.std(ddof=0)
+        X = X.replace([np.inf, -np.inf], np.nan).dropna()
+        if len(X) >= 5:
+            cov = np.cov(X.values.T)
+            eigvals, eigvecs = np.linalg.eigh(cov)
+            idx = np.argsort(eigvals)[::-1]
+            eigvals = eigvals[idx]
+            eigvecs = eigvecs[:, idx]
+            evr = eigvals / eigvals.sum()
+            evr1, evr2 = float(evr[0]), float(evr[1])
+            loadings = pd.DataFrame({"trait": traits, "PC1": eigvecs[:, 0], "PC2": eigvecs[:, 1]})
+
     color_wood = d.get("woodiness", pd.Series(index=d.index, dtype=str)).astype(str).str.lower().str.contains("wood")
-    axs[0, 0].scatter(d["PC1"], d["PC2"], c=np.where(color_wood, 1, 0), s=18, alpha=0.7)
+    axs[0, 0].scatter(d.loc[~color_wood, "PC1"], d.loc[~color_wood, "PC2"], s=18, alpha=0.7, label="non-woody")
+    axs[0, 0].scatter(d.loc[color_wood, "PC1"], d.loc[color_wood, "PC2"], s=18, alpha=0.7, label="woody")
     axs[0, 0].set_title("PCA by woodiness")
 
     mem = d["in_EcoBank"].astype(int) + 2 * d["in_GlobalAMFungi"].astype(int)
-    axs[0, 1].scatter(d["PC1"], d["PC2"], c=mem, s=18, alpha=0.7)
+    for m, lab in [(0, "neither"), (1, "EcoBank"), (2, "GlobalAMFungi"), (3, "both")]:
+        sel = mem == m
+        if sel.any():
+            axs[0, 1].scatter(d.loc[sel, "PC1"], d.loc[sel, "PC2"], s=18, alpha=0.7, label=lab)
     axs[0, 1].set_title("PCA by AMF dataset membership")
+
+    if loadings is not None:
+        for ax in [axs[0, 0], axs[0, 1]]:
+            for _, r in loadings.iterrows():
+                ax.arrow(0, 0, r["PC1"] * 2.0, r["PC2"] * 2.0, color="black", width=0.003, alpha=0.7)
+                ax.text(r["PC1"] * 2.15, r["PC2"] * 2.15, r["trait"], fontsize=8)
+            ax.set_xlabel(f"PC1 ({evr1*100:.1f}% var)")
+            ax.set_ylabel(f"PC2 ({evr2*100:.1f}% var)")
 
     for ax, x in [(axs[1, 0], "PC1"), (axs[1, 1], "PC2")]:
         for ycol, label in [("EcoBank_amf_richness_mean", "EcoBank"), ("GlobalAMFungi_amf_richness_mean", "GlobalAMFungi")]:
@@ -122,9 +151,12 @@ def fig4_pca(master: pd.DataFrame, out_base: Path) -> None:
         ax.set_title(f"{x} vs AMF richness")
         ax.set_xlabel(x)
         ax.set_ylabel("AMF richness")
-    axs[1, 0].legend(frameon=False)
+    for ax in axs.ravel():
+        handles, labels = ax.get_legend_handles_labels()
+        if handles:
+            ax.legend(frameon=False)
     _panel_labels(axs)
-    save_png_pdf(fig, out_base)
+    save_png(fig, out_base)
 
 
 def _scatter_with_fit(ax, d: pd.DataFrame, x: str, y: str, label: str) -> tuple[int, float, float]:
@@ -148,9 +180,15 @@ def fig5_richness_vs_traits(master: pd.DataFrame, out_base: Path) -> None:
         text = []
         for y, label in [("EcoBank_amf_richness_mean", "EcoBank"), ("GlobalAMFungi_amf_richness_mean", "GlobalAMFungi")]:
             if y in master.columns:
-                n, r2, p = _scatter_with_fit(ax, master, t, y, label)
-                if n:
+                d = master[[t, y]].dropna().copy()
+                if len(d):
+                    lo, hi = d[t].quantile([0.01, 0.99])
+                    d = d[(d[t] >= lo) & (d[t] <= hi)]
+                n, r2, p = _scatter_with_fit(ax, d, t, y, label)
+                if n >= 20:
                     text.append(f"{label}: n={n}, R2={r2:.2f}, p={p:.3g}")
+                elif n > 0:
+                    text.append(f"{label}: n={n} (insufficient for stable fit)")
         ax.set_title(t)
         ax.set_xlabel(t)
         ax.set_ylabel("AMF richness")
@@ -159,7 +197,7 @@ def fig5_richness_vs_traits(master: pd.DataFrame, out_base: Path) -> None:
     axs.ravel()[0].legend(frameon=False)
     axs.ravel()[-1].axis("off")
     _panel_labels(axs)
-    save_png_pdf(fig, out_base)
+    save_png(fig, out_base)
 
 
 def fig6_guilds_vs_traits(master: pd.DataFrame, out_base: Path) -> None:
@@ -179,10 +217,12 @@ def fig6_guilds_vs_traits(master: pd.DataFrame, out_base: Path) -> None:
             p_adj = (dd[g] * (n - 1) + 0.5) / n
             dd["logit"] = np.log(p_adj.clip(1e-6, 1 - 1e-6) / (1 - p_adj.clip(1e-6, 1 - 1e-6)))
             nn, r2, p = _scatter_with_fit(ax, dd.rename(columns={"logit": g + "_logit"}), t, g + "_logit", "")
-            ax.set_title(f"{g} vs {t}", fontsize=9)
+            ax.set_title(f"{g.split('_')[-2]} vs {t}", fontsize=9)
+            ax.set_xlabel(t)
+            ax.set_ylabel(f"logit({g})")
             ax.text(0.03, 0.97, f"n={nn}, R2={r2:.2f}, p={p:.3g}", transform=ax.transAxes, va="top", fontsize=7)
     _panel_labels(axs)
-    save_png_pdf(fig, out_base)
+    save_png(fig, out_base)
 
 
 def fig7_woody_sensitivity(master: pd.DataFrame, out_base: Path) -> None:
@@ -201,10 +241,13 @@ def fig7_woody_sensitivity(master: pd.DataFrame, out_base: Path) -> None:
                     p_adj = (data[col] * (n - 1) + 0.5) / n
                     data[col] = np.log(p_adj.clip(1e-6, 1 - 1e-6) / (1 - p_adj.clip(1e-6, 1 - 1e-6)))
                 _scatter_with_fit(ax, data, t, col, g)
-            ax.set_title(f"{resp} vs {t}")
+            short = "AMF richness" if "richness" in resp else "rhizophilic proportion"
+            ax.set_title(f"{short} vs {t}")
+            ax.set_xlabel(t)
+            ax.set_ylabel(short)
     axs[0, 0].legend(frameon=False)
     _panel_labels(axs)
-    save_png_pdf(fig, out_base)
+    save_png(fig, out_base)
 
 
 def fig8_genus_sensitivity(genus_master: pd.DataFrame, out_base: Path) -> None:
@@ -215,7 +258,10 @@ def fig8_genus_sensitivity(genus_master: pd.DataFrame, out_base: Path) -> None:
             d = genus_master[[t, "EcoBank_amf_richness_mean", "n_species"]].dropna()
             if len(d):
                 ax.scatter(d[t], d["EcoBank_amf_richness_mean"], s=10 + d["n_species"] * 2, alpha=0.5)
-                _scatter_with_fit(ax, d, t, "EcoBank_amf_richness_mean", "")
+                n, r2, p = _scatter_with_fit(ax, d, t, "EcoBank_amf_richness_mean", "")
+                ax.text(0.03, 0.97, f"n={n}, R2={r2:.2f}, p={p:.3g}", transform=ax.transAxes, va="top", fontsize=8)
             ax.set_title(f"Genus richness vs {t}")
+            ax.set_xlabel(t)
+            ax.set_ylabel("Genus-level AMF richness")
     _panel_labels(axs)
-    save_png_pdf(fig, out_base)
+    save_png(fig, out_base)

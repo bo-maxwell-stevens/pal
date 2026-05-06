@@ -1,9 +1,0 @@
-dataset,fred_source,n_dataset_species,n_fred_species,exact_matches,match_percent,genus_overlap
-EcoBank,FRED_4_full_20260312_2.csv,529,7005,153,28.92,232
-EcoBank,FRED3_fineRoots.csv,529,204,83,15.69,88
-EcoBank,FRED_4_20250921_filteredforMicrobeNet_AMF_FineRootsLess2mm.csv,529,992,37,6.99,115
-EcoBank,FRED_4_20250921_filteredforMicrobeNet_AMF_1stOrderRoots.csv,529,558,11,2.08,50
-GlobalAMFungi,FRED_4_full_20260312_2.csv,285,7005,112,39.3,171
-GlobalAMFungi,FRED3_fineRoots.csv,285,204,65,22.81,76
-GlobalAMFungi,FRED_4_20250921_filteredforMicrobeNet_AMF_FineRootsLess2mm.csv,285,992,45,15.79,97
-GlobalAMFungi,FRED_4_20250921_filteredforMicrobeNet_AMF_1stOrderRoots.csv,285,558,18,6.32,46
