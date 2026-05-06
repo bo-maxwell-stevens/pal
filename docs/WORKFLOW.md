@@ -29,8 +29,15 @@ This generates:
 - overlap summary table,
 - species-level and genus-level master tables,
 - species/genus model summary tables,
-- multi-panel figures `Fig1` to `Fig8` in PNG and PDF,
-- report: `Output/Reports/fred_amf_next_analysis_report.md`.
+- multi-panel figures `Fig1` to `Fig8` in PNG,
+- report: `Output/Reports/fred_amf_next_analysis_report.md`,
+- figure trends summary: `Output/Reports/fred_amf_figure_trends_summary.md`.
+
+## Current interpretation status
+
+- `Fig1` and overlap tables are the most robust outputs.
+- `Fig5` to `Fig7` are exploratory because complete-case overlap is limited for full multivariate species-level fits.
+- `Fig6` and rhizophilic responses should be interpreted cautiously because many values are near the upper bound.
 
 ## Notebook conversion
 

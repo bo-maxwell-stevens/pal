@@ -30,6 +30,9 @@
 - Fig7_woody_herbaceous_sensitivity.png
 - Fig8_genus_level_sensitivity.png
 
+Figure interpretation summary:
+- `Output/Reports/fred_amf_figure_trends_summary.md`
+
 ## Main preliminary statistical results
 - Species-level models: `/home/stevens/projects/pal/Output/Tables/species_level_model_summaries.csv`
 - Genus-level models: `/home/stevens/projects/pal/Output/Tables/genus_level_model_summaries.csv`

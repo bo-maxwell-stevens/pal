@@ -36,11 +36,13 @@ Primary outputs:
 - `Output/Tables/fred4_amf_genus_master_table.csv`
 - `Output/Tables/species_level_model_summaries.csv`
 - `Output/Tables/genus_level_model_summaries.csv`
-- `Output/Figures/Fig1_...` through `Fig8_...` in PNG and PDF
+- `Output/Figures/Fig1_...` through `Fig8_...` in PNG
 - `Output/Reports/fred_amf_next_analysis_report.md`
+- `Output/Reports/fred_amf_figure_trends_summary.md`
 
 ## Notes
 
 - No download step is required for this comparison.
 - The script reads local files in `Data/` and `Output/` only.
 - FRED parsing is robust to encodings (`utf-8`, `latin-1`, `cp1252`) and uses the established header-row convention from your notebooks.
+- Guild proportion analyses are logit-transformed after automatic percent-to-proportion scaling when values are stored as 0-100.

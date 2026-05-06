@@ -22,6 +22,7 @@ This document compares species matching between plant datasets and available FRE
 - The new full FRED has the largest species coverage and gives the highest exact match counts for both datasets.
 - Relative gain is substantial vs the previously used filtered files.
 - `FRED3_fineRoots.csv` still performs well despite being much smaller, likely because of overlap in sampled taxa.
+- The current pipeline uses strict canonical binomials; counts may differ from earlier exploratory runs that retained non-binomial names.
 
 ## Likely (non-exact) matches
 
@@ -38,3 +39,6 @@ Command used:
 ```bash
 PYTHONPATH=src /home/stevens/miniconda3/bin/python scripts/compare_fred_sources.py
 ```
+
+Related interpretation report:
+- `Output/Reports/fred_amf_figure_trends_summary.md`
