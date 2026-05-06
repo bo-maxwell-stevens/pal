@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+
+# Local data artifacts
+Data/
+
+# Large analysis outputs (keep docs tracked)
+Output/Figures/
+Output/*.png
+Output/*.jpg
+Output/*.zip
+
+# Notebook checkpoints
+Code/.ipynb_checkpoints/

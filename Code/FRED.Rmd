@@ -1,0 +1,1474 @@
+---
+title: "FRED"
+author: "Tanel"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE}
+if (!require("pacman")) install.packages("pacman"); library(pacman)
+pacman::p_load(tidyverse,
+stringr,
+Matrix,
+iNEXT,
+ggiNEXT,
+car,
+lmerTest,
+ggpubr,
+ggplot2,
+multcomp,
+MuMIn,
+reshape2,
+car,
+nlme,
+DHARMa,
+gridExtra,
+factoextra,
+spaMM,
+vegan,
+magrittr,
+rcompanion,
+corrr,
+GGally,
+plotly,
+rnaturalearthhires,
+cowplot,
+sjPlot,
+partR2,
+sf)
+library(hillR)
+library(rnaturalearthhires)
+library(rnaturalearth)
+```
+
+
+# set wd
+```{r}
+setwd("C:/Users/pcadmin/Nextcloud/FredAMF")
+```
+
+#import data
+
+```{r}
+ecobank <- read.csv("C:/Users/pcadmin/Nextcloud/FredAMF/ecobank_full.csv", sep=";")
+vt <- read.csv("C:/Users/pcadmin/Nextcloud/FredAMF/ecobank_cultured.csv", sep=";")
+fred<- read.csv("C:/Users/pcadmin/Nextcloud/FredAMF/FRED3_fineRoots.csv", sep=",")
+```
+
+
+# order ecobank by sample
+
+```{r}
+ecobank <- ecobank[order(ecobank$sample),]
+```
+
+# order vt byt sample
+
+```{r}
+vt <- vt[order(vt$sample),]
+```
+
+# merge ecobank and vt by sample
+
+```{r}
+roots <- merge(ecobank, vt, by = "sample",all.x=FALSE)
+```
+
+# filter ecobank data where isRoots=TRUE
+
+```{r}
+roots <- subset(roots, isRoot == TRUE)
+```
+
+# extract unique plant_species
+
+```{r}
+plant_species <- unique(roots$plant_species)
+plant_species<-as.data.frame(plant_species)
+```
+
+# write csv with plant_species
+
+```{r}
+write.csv(plant_species, "C:/Users/pcadmin/Nextcloud/FredAMF/plant_species_Tartu.csv")
+```
+
+
+# map points in roots by plot.latitude and plot.longitude in rnaturalearth
+
+# Variable maps
+```{r}
+basemap <- st_as_sf(ne_countries(scale = 50, returnclass= "sf"))
+basemap %<>% st_transform("+proj=longlat +ellps=WGS84")
+```
+
+
+# make first row as header in fred
+
+```{r}
+colnames(fred) <- fred[1,]
+fred <- fred[-1,]
+#rename Latitude_Main to lat and Longitude_Main to lon
+fred <- fred %>% rename(lat = Latitude_Main, lon = Longitude_Main)
+```
+
+
+
+# plot map with points from fred
+```{r}
+point_data <- fred %>%
+  dplyr::select(lon, lat) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = "+proj=longlat +ellps=WGS84")
+
+m_altitude <- ggplot(basemap) +
+  geom_sf() +
+  geom_sf(data = point_data, aes(), alpha = 1, size = 0.7) +
+  theme_void()
+
+m_altitude
+# save as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/map_fred.jpg", width = 30, height = 15, units = "cm")
+```
+
+# plot both roots and fred points on one map
+```{r}
+point_data <- roots %>% dplyr::select(lon, lat) %>%
+  st_as_sf(coords = c("lon", "lat"),
+           crs = "+proj=longlat +ellps=WGS84")
+point_data_fred <- fred %>%
+  dplyr::select(lon, lat) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = "+proj=longlat +ellps=WGS84")
+m_fredamf <- ggplot(basemap) +
+  geom_sf() +
+  geom_sf(data = point_data, aes(),color="blue", alpha = 1, size = 0.7) +
+  scale_color_viridis_c(name = "richness") +
+  geom_sf(data = point_data_fred, aes(),color="red", alpha = 1, size = 0.7) +
+  theme_void()
+m_fredamf
+# save as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/map_both.jpg", width = 30, height = 15, units = "cm")
+```
+
+# combine fred columns 18 and 19 into one
+
+```{r}
+fred$species <- paste(fred$`Plant taxonomy_Genus_Data Source`, fred$`Plant taxonomy_Species_Data source`, sep = " ")
+```
+
+# count unique species in fred
+```{r}
+unique_fred<-unique(fred$species)
+```
+
+# see how many unique overlap with roots$plant_species
+```{r}
+overlap <- unique_fred[unique_fred %in% roots$plant_species]
+length(overlap)
+```
+#COUNT UNIQUE SPECIES IN ROOTS
+```{r}
+unique_roots<-unique(roots$plant_species)
+```
+
+#overlap of unique_fred and unique_roots
+
+```{r}
+overlap <- unique_fred[unique_fred %in% unique_roots]
+length(overlap)
+```
+# make a dataset with only the species that are in both roots and fred
+```{r}
+fred_roots <- fred[fred$species %in% overlap,]
+roots_vt<- roots[roots$plant_species %in% overlap,]
+roots_vt$prop.cult<-as.numeric(roots_vt$prop.cult)
+roots_vt$prop.ancestral<-as.numeric(roots_vt$prop.ancestral)
+roots_vt$prop.edaphophilic<-as.numeric(roots_vt$prop.edaphophilic)
+roots_vt$prop.rhizophilic<-as.numeric(roots_vt$prop.rhizophilic)
+roots_vt$spec.ances<-as.numeric(roots_vt$spec.ances)
+roots_vt$spec.edaph<-as.numeric(roots_vt$spec.edaph)
+roots_vt$spec.rhizo<-as.numeric(roots_vt$spec.rhizo)
+```
+
+# create a dataset with plant_species by mean richness_raw, prop.cultured, prop.ancestral, prop.edaphophilic, prop.rhizophilic, spec.ances, spec.edaph, spec.rhizo
+```{r}
+richness_vt <- roots_vt %>%
+  group_by(plant_species) %>%
+  summarise(mean_richness = mean(richness, na.rm = TRUE),
+            mean_prop_cult = mean(prop.cult, na.rm = TRUE),
+            mean_prop_ancestral = mean(prop.ancestral, na.rm = TRUE),
+            mean_prop_edaphophilic = mean(prop.edaphophilic, na.rm = TRUE),
+            mean_prop_rhizophilic = mean(prop.rhizophilic, na.rm = TRUE),
+            mean_sp_ancestral = mean(spec.ances,na.rm=TRUE),
+            mean_sp_rhizophilic = mean(spec.rhizo,na.rm=TRUE),
+            mean_sp_edaphophilic = mean(spec.edaph,na.rm=TRUE)) %>%
+  arrange(desc(mean_richness))
+```
+
+# create a dataset with species by mean 'Specific root length (SRL)' from fred_roots
+```{r}
+fred_roots$`Specific root length (SRL)`<- as.numeric(fred_roots$`Specific root length (SRL)`)
+srl_fred <- fred_roots %>%
+  group_by(species) %>%
+  summarise(mean_srl = mean(`Specific root length (SRL)`, na.rm = TRUE)) %>%
+  arrange(desc(mean_srl))
+```
+
+# do the same for 'Root tissue density (RTD)' from fred_roots
+```{r}
+fred_roots$`Root tissue density (RTD)`<- as.numeric(fred_roots$`Root tissue density (RTD)`)
+rtd_fred <- fred_roots %>%
+  group_by(species) %>%
+  summarise(mean_rtd = mean(`Root tissue density (RTD)`, na.rm = TRUE)) %>%
+  arrange(desc(mean_rtd))
+```
+
+# do the same for 'Root diameter (RD)' from fred_roots
+```{r}
+fred_roots$`Root diameter`<- as.numeric(fred_roots$`Root diameter`)
+rd_fred <- fred_roots %>%
+  group_by(species) %>%
+  summarise(mean_rd = mean(`Root diameter`, na.rm = TRUE)) %>%
+  arrange(desc(mean_rd))
+```
+
+# do the same for 'Root N content'
+
+```{r}
+fred_roots$`Root N content`<- as.numeric(fred_roots$`Root N content`)
+rnc_fred <- fred_roots %>%
+  group_by(species) %>%
+  summarise(mean_rnc = mean(`Root N content`, na.rm = TRUE)) %>%
+  arrange(desc(mean_rnc))
+```
+
+# merge by species
+```{r}
+richness_srl_rtd_rd <- merge(richness_vt, srl_fred, by.x = "plant_species", by.y = "species")
+richness_srl_rtd_rd <- merge(richness_srl_rtd_rd, rtd_fred, by.x = "plant_species", by.y = "species")
+richness_srl_rtd_rd <- merge(richness_srl_rtd_rd, rd_fred, by.x = "plant_species", by.y = "species")
+richness_srl_rtd_rd <- merge(richness_srl_rtd_rd, rnc_fred, by.x = "plant_species", by.y = "species")
+richness_srl_rtd_rd <- richness_srl_rtd_rd %>%
+  arrange(desc(mean_richness))
+```
+
+# plot richness vs srl
+
+```{r}
+p1<-ggplot(richness_srl_rtd_rd, aes(x = mean_richness, y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(8, 37) +
+  labs(x = "Mean VT richness", y = "Mean SRL(34)") +
+  theme_minimal()
+```
+# plot richness vs rtd
+```{r}
+p2<-ggplot(richness_srl_rtd_rd, aes(x = mean_richness, y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(8, 37) +
+  labs(x = "Mean VT richness", y = "Mean RTD (30)") +
+  theme_minimal()
+```
+# plot richness vs rd
+```{r}
+p3<-ggplot(richness_srl_rtd_rd, aes(x = mean_richness, y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(8, 37) +
+  labs(x = "Mean VT richness", y = "Mean RD (32)") +
+  theme_minimal()
+```
+
+# plot richness vs rnc
+```{r}
+p4<-ggplot(richness_srl_rtd_rd, aes(x = mean_richness, y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(8, 37) +
+  labs(x = "Mean VT richness", y = "Mean RNC (24)") +
+  theme_minimal()
+```
+
+# plot all three together
+```{r}
+library(gridExtra)
+p5<-grid.arrange(p1, p2, p3,p4, ncol=2)
+```
+# save p4 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/richness_srl_rtd_rd.jpg", plot = p5, width = 30, height = 30, units = "cm")
+```
+
+# plot prop.cultured vs srl
+```{r}
+p1<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_cult), y = mean_srl)) +
+  geom_point() +
+  xlim(-2.5, 0.5) +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. cultured vt", y = "Mean SRL") +
+  theme_minimal()
+```
+# plot prop.cultured vs rtd
+```{r}
+p2<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_cult), y = mean_rtd)) +
+  geom_point() +
+  xlim(-2.5, 0.5) +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. cultured vt", y = "Mean RTD") +
+  theme_minimal()
+```
+
+# plot prop.cultured vs rd
+```{r}
+p3<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_cult), y = mean_rd)) +
+  geom_point() +
+  xlim(-2.5, 1) +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. cultured vt", y = "Mean RD") +
+  theme_minimal()
+```
+
+# plot prop.cultured vs rnc
+```{r}
+p4<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_cult), y = mean_rnc)) +
+  geom_point() +
+  xlim(-2.5, 0) +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. cultured vt", y = "Mean RNC") +
+  theme_minimal()
+```
+
+# plot all three together
+```{r}
+p5<-grid.arrange(p1, p2, p3,p4, ncol=2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/prop_cult_srl_rtd_rd.jpg", plot = p5, width = 30, height = 30, units = "cm")
+```
+
+# plot srl vs rtd
+```{r}
+ggplot(richness_srl_rtd_rd, aes(x = mean_srl, y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean SRL", y = "Mean RTD") +
+  theme_minimal()
+```
+# plot srl vs rd
+```{r}
+ggplot(richness_srl_rtd_rd, aes(x = mean_srl, y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean SRL", y = "Mean RD") +
+  theme_minimal()
+```
+# plot prop.ancestral vs srl
+```{r}
+p1<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_ancestral), y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. ancestral vt", y = "Mean SRL") +
+  theme_minimal()
+```
+# plot prop.ancestral vs rtd
+```{r}
+p2<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_ancestral), y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. ancestral vt", y = "Mean RTD") +
+  theme_minimal()
+```
+# plot prop.ancestral vs rd
+```{r}
+p3<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_ancestral), y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. ancestral vt", y = "Mean RD") +
+  theme_minimal()
+```
+# plot prop.ancestral vs rnc
+```{r}
+p4<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_ancestral), y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. ancestral vt", y = "Mean RNC") +
+  theme_minimal()
+```
+# plot all three together
+```{r}
+p5<-grid.arrange(p1, p2, p3,p4, ncol=2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/prop_ancestral_srl_rtd_rd.jpg", plot = p5, width = 30, height = 30, units = "cm")
+```
+
+# plot prop.edaphophilic vs srl
+```{r}
+p1<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_edaphophilic), y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. edaphophilic vt", y = "Mean SRL") +
+  theme_minimal()
+```
+# plot prop.edaphophilic vs rtd
+```{r}
+p2<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_edaphophilic), y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. edaphophilic vt", y = "Mean RTD") +
+  theme_minimal()
+```
+# plot prop.edaphophilic vs rd
+```{r}
+p3<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_edaphophilic), y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. edaphophilic vt", y = "Mean RD") +
+  theme_minimal()
+```
+# plot prop.edaphophilic vs rnc
+```{r}
+p4<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_edaphophilic), y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-3.75, -3) +
+  labs(x = "logit Prop. edaphophilic vt", y = "Mean RNC") +
+  theme_minimal()
+```
+# plot all three together
+```{r}
+p5<-grid.arrange(p1, p2, p3,p4, ncol=2)
+```
+
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/prop_edaphophilic_srl_rtd_rd.jpg", plot = p5, width = 30, height = 30, units = "cm")
+```
+
+# plot prop.rhizophilic vs srl
+```{r}
+p1<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_rhizophilic), y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(1.5, 3.8) +
+  labs(x = "logit Prop. rhizophilic vt", y = "Mean SRL") +
+  theme_minimal()
+```
+# plot prop.rhizophilic vs rtd
+```{r}
+p2<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_rhizophilic), y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(1.5, 3.8) +
+  labs(x = "logit Prop. rhizophilic vt", y = "Mean RTD") +
+  theme_minimal()
+```
+# plot prop.rhizophilic vs rd
+```{r}
+p3<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_rhizophilic), y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(1.5, 3.8) +
+  labs(x = "logit Prop. rhizophilic vt", y = "Mean RD") +
+  theme_minimal()
+```
+# plot prop.rhizophilic vs rnc
+```{r}
+p4<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_prop_rhizophilic), y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(1.5, 3.8) +
+  labs(x = "logit Prop. rhizophilic vt", y = "Mean RNC") +
+  theme_minimal()
+```
+# plot all three together
+```{r}
+p5<-grid.arrange(p1, p2, p3,p4, ncol=2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/prop_rhizophilic_srl_rtd_rd.jpg", plot = p5, width = 30, height = 30, units = "cm")
+```
+
+# repeat previous with mean_sp_ancestral, mean_sp_rhizophilic, mean_sp_edaphophilic
+# plot mean_sp_ancestral vs srl
+```{r}
+p1<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_ancestral), y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.ances pres/abs", y = "Mean SRL") +
+  theme_minimal()
+```
+# plot mean_sp_ancestral vs rtd
+```{r}
+p2<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_ancestral), y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.ances pres/abs", y = "Mean RTD") +
+  theme_minimal()
+```
+# plot mean_sp_ancestral vs rd
+```{r}
+p3<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_ancestral), y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.ances pres/abs", y = "Mean RD") +
+  theme_minimal()
+```
+# plot mean_sp_ancestral vs rnc
+```{r}
+p4<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_ancestral), y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.rhizo pres/abs", y = "Mean RNC") +
+  theme_minimal()
+```
+# plot all three together
+```{r}
+p5<-grid.arrange(p1, p2, p3,p4, ncol=2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/mean_sp_ancestral_srl_rtd_rd.jpg", plot = p5, width = 30, height = 30, units = "cm")
+```
+
+# plot mean_sp_rhizophilic vs srl
+```{r}
+p1<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_rhizophilic), y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.rhizo pres/abs", y = "Mean SRL") +
+  theme_minimal()
+```
+# plot mean_sp_rhizophilic vs rtd
+```{r}
+p2<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_rhizophilic), y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.rhizo pres/abs", y = "Mean RTD") +
+  theme_minimal()
+```
+# plot mean_sp_rhizophilic vs rd
+```{r}
+p3<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_rhizophilic), y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.rhizo pres/abs", y = "Mean RD") +
+  theme_minimal()
+```
+# plot mean_sp_rhizophilic vs rnc
+```{r}
+p4<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_rhizophilic), y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.rhizo pres/abs", y = "Mean RNC") +
+  theme_minimal()
+```
+# plot all three together
+```{r}
+p5<-grid.arrange(p1, p2, p3,p4, ncol=2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/mean_sp_rhizophilic_srl_rtd_rd.jpg", plot = p5, width = 30, height = 30, units = "cm")
+```
+# plot mean_sp_edaphophilic vs srl
+```{r}
+p1<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_edaphophilic), y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.edaph pres/abs", y = "Mean SRL") +
+  theme_minimal()
+```
+# plot mean_sp_edaphophilic vs rtd
+```{r}
+p2<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_edaphophilic), y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.edaph pres/abs", y = "Mean RTD") +
+  theme_minimal()
+```
+# plot mean_sp_edaphophilic vs rd
+```{r}
+p3<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_edaphophilic), y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.edaph pres/abs", y = "Mean RD") +
+  theme_minimal()
+```
+# plot mean_sp_edaphophilic vs rnc
+```{r}
+p4<-ggplot(richness_srl_rtd_rd, aes(x = logit(mean_sp_edaphophilic), y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit prop.edaph pres/abs", y = "Mean RNC") +
+  theme_minimal()
+```
+# plot all three together
+```{r}
+p5<-grid.arrange(p1, p2, p3,p4, ncol=2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/mean_sp_edaphophilic_srl_rtd_rd.jpg", plot = p5, width = 30, height = 30, units = "cm")
+```
+
+#import MaarjAM data
+
+```{r}
+maarjam <- read.csv("C:/Users/pcadmin/Nextcloud/FredAMF/maarjam_export_host_plants.csv", sep=";")
+```
+
+#remove rows from maarjam where species is sp.
+```{r}
+maarjam <- maarjam[!grepl("sp\\.", maarjam$species), ]
+```
+
+# lat and lon as.numeric
+```{r}
+maarjam$lat <- as.numeric(maarjam$lat)
+maarjam$lon <- as.numeric(maarjam$lon)
+```
+
+# remove maarjam rows with NA in lat or lon
+```{r}
+maarjam <- maarjam[!is.na(maarjam$lat) & !is.na(maarjam$lon), ]
+```
+
+#combine maarjam columns 18 and 19 into one
+
+```{r}
+maarjam$species <- paste(maarjam$genus, maarjam$species, sep = " ")
+```
+
+# count unique species in maarjam
+```{r}
+unique_maarjam<-unique(maarjam$species)
+```
+# see how many unique overlap with roots$plant_species
+```{r}
+overlap <- unique_maarjam[unique_maarjam %in% roots$plant_species]
+length(overlap)
+```
+# keep only species from overlap in maarjam
+```{r}
+maarjam <- maarjam[maarjam$species %in% overlap,]
+```
+
+# count unique species in maarjam
+```{r}
+unique_maarjam<-unique(maarjam$species)
+```
+
+# see how many unique_fred overlap with unique_maarjam
+```{r}
+overlap <- unique_fred[unique_fred %in% unique_maarjam]
+length(overlap)
+```
+
+# plot maarjam and fred on one map, give points in maarjam names by smID
+```{r}
+point_data <- maarjam %>%
+  dplyr::select(lon, lat) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = "+proj=longlat +ellps=WGS84")
+point_data_fred <- fred %>%
+  dplyr::select(lon, lat) %>%
+  st_as_sf(coords = c("lon", "lat"), crs = "+proj=longlat +ellps=WGS84")
+m_fredamf <- ggplot(basemap) +
+  geom_sf() +
+  geom_sf(data = point_data, aes(),color="blue", alpha = 1, size = 0.7) +
+  scale_color_viridis_c(name = "richness") +
+  geom_sf(data = point_data_fred, aes(),color="red", alpha = 1, size = 0.7) +
+  theme_void()
+m_fredamf
+# save as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/map_both_maarjam.jpg", width = 30, height = 15, units = "cm")
+```
+# create a data table where species are in first column and virtTaxon in other columns
+
+```{r}
+# create a data table with maarjam species and their corresponding virtTaxon
+# species in first column and virtTaxon in other columns
+maarjam_byvt <- maarjam %>%
+  group_by(species) %>%
+  summarise(virtTaxon = paste(unique(virtTaxon), collapse = ", ")) %>%
+  arrange(species)
+```
+
+# split maarjam_byvt$virtTaxon into separate columns
+```{r}
+maarjam_byvt <- maarjam_byvt %>%
+  separate(virtTaxon, into = paste0("virtTaxon", 1:148), sep = ", ", fill = "right", extra = "drop")
+```
+# replace NULL with NA
+```{r}
+maarjam_byvt[maarjam_byvt == "NULL"] <- NA
+```
+# remove rows with colums 2:149 that are all NA
+```{r}
+maarjam_byvt <- maarjam_byvt %>%
+  filter(rowSums(is.na(.[2:149])) != ncol(.[2:149]))
+```
+#write csv file with maarjam_byvt
+```{r}
+write.csv(maarjam_byvt, "C:/Users/pcadmin/Nextcloud/FredAMF/maarjam_byvt.csv", row.names = FALSE)
+```
+
+# create a string with unique from maarjam_byvt columns 2:149
+```{r}
+unique_virtTaxon <- unique(unlist(maarjam_byvt[2:149]))
+```
+
+# write csv file with unique_virtTaxon
+```{r}
+write.csv(unique_virtTaxon, "C:/Users/pcadmin/Nextcloud/FredAMF/unique_virtTaxon.csv", row.names = FALSE)
+```
+
+# import plant_VT_traits
+
+```{r}
+maarjam2 <- read.csv("C:/Users/pcadmin/Nextcloud/FredAMF/plant_VT_traits.csv", sep=";")
+```
+
+# filter fred to have only species in maarjam2
+
+```{r}
+fred2 <- fred[fred$species %in% maarjam2$species,]
+```
+
+# count unique species in fred2
+```{r}
+unique_fred2<-unique(fred2$species)
+```
+
+# create a dataset with species by mean 'Specific root length (SRL)' from fred2
+
+```{r}
+fred2$`Specific root length (SRL)`<- as.numeric(fred2$`Specific root length (SRL)`)
+srl_fred2 <- fred2 %>%
+  group_by(species) %>%
+  summarise(mean_srl = mean(`Specific root length (SRL)`, na.rm = TRUE)) %>%
+  arrange(desc(mean_srl))
+```
+# create a dataset with species by mean 'Root tissue density (RTD)' from fred2
+```{r}
+fred2$`Root tissue density (RTD)`<- as.numeric(fred2$`Root tissue density (RTD)`)
+rtd_fred2 <- fred2 %>%
+  group_by(species) %>%
+  summarise(mean_rtd = mean(`Root tissue density (RTD)`, na.rm = TRUE)) %>%
+  arrange(desc(mean_rtd))
+```
+# create a dataset with species by mean 'Root diameter (RD)' from fred2
+```{r}
+fred2$`Root diameter`<- as.numeric(fred2$`Root diameter`)
+rd_fred2 <- fred2 %>%
+  group_by(species) %>%
+  summarise(mean_rd = mean(`Root diameter`, na.rm = TRUE)) %>%
+  arrange(desc(mean_rd))
+```
+# create a dataset with species by mean 'Root N content' from fred2
+```{r}
+fred2$`Root N content`<- as.numeric(fred2$`Root N content`)
+rnc_fred2 <- fred2 %>%
+  group_by(species) %>%
+  summarise(mean_rnc = mean(`Root N content`, na.rm = TRUE)) %>%
+  arrange(desc(mean_rnc))
+```
+# merge by species
+```{r}
+richness_srl_rtd_rd2 <- merge(richness_vt, srl_fred2, by.x = "plant_species", by.y = "species")
+richness_srl_rtd_rd2 <- merge(richness_srl_rtd_rd2, rtd_fred2, by.x = "plant_species", by.y = "species")
+richness_srl_rtd_rd2 <- merge(richness_srl_rtd_rd2, rd_fred2, by.x = "plant_species", by.y = "species")
+richness_srl_rtd_rd2 <- merge(richness_srl_rtd_rd2, rnc_fred2, by.x = "plant_species", by.y = "species")
+richness_srl_rtd_rd2 <- richness_srl_rtd_rd2 %>%
+  arrange(desc(mean_richness))
+```
+# plot richness vs srl
+```{r}
+p1<-ggplot(richness_srl_rtd_rd2, aes(x = mean_richness, y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(8, 37) +
+  labs(x = "Mean VT richness", y = "Mean SRL(34)") +
+  theme_minimal()
+```
+# plot richness vs rtd
+```{r}
+p2<-ggplot(richness_srl_rtd_rd2, aes(x = mean_richness, y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(8, 37) +
+  labs(x = "Mean VT richness", y = "Mean RTD (30)") +
+  theme_minimal()
+```
+# plot richness vs rd
+```{r}
+p3<-ggplot(richness_srl_rtd_rd2, aes(x = mean_richness, y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(8, 37) +
+  labs(x = "Mean VT richness", y = "Mean RD (32)") +
+  theme_minimal()
+```
+# plot richness vs rnc
+```{r}
+p4<-ggplot(richness_srl_rtd_rd2, aes(x = mean_richness, y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(8, 37) +
+  labs(x = "Mean VT richness", y = "Mean RNC (24)") +
+  theme_minimal()
+```
+# plot all three together
+```{r}
+p5<-grid.arrange(p1, p2, p3,p4, ncol=2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/richness_srl_rtd_rd2.jpg", plot = p5, width = 30, height = 30, units = "cm")
+```
+
+# plot prop.cultured vs srl
+```{r}
+p1<-ggplot(richness_srl_rtd_rd2, aes(x = logit(mean_prop_cult), y = mean_srl)) +
+  geom_point() +
+  xlim(-2.5, 0.5) +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. cultured vt", y = "Mean SRL") +
+  theme_minimal()
+```
+# plot prop.cultured vs rtd
+```{r}
+p2<-ggplot(richness_srl_rtd_rd2, aes(x = logit(mean_prop_cult), y = mean_rtd)) +
+  geom_point() +
+  xlim(-2.5, 0.5) +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. cultured vt", y = "Mean RTD") +
+  theme_minimal()
+```
+# plot prop.cultured vs rd
+```{r}
+p3<-ggplot(richness_srl_rtd_rd2, aes(x = logit(mean_prop_cult), y = mean_rd)) +
+  geom_point() +
+  xlim(-2.5, 1) +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. cultured vt", y = "Mean RD") +
+  theme_minimal()
+```
+# plot prop.cultured vs rnc
+```{r}
+p4<-ggplot(richness_srl_rtd_rd2, aes(x = logit(mean_prop_cult), y = mean_rnc)) +
+  geom_point() +
+  xlim(-2.5, 0) +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. cultured vt", y = "Mean RNC") +
+  theme_minimal()
+```
+# plot all three together
+```{r}
+p5<-grid.arrange(p1, p2, p3,p4, ncol=2)
+```
+
+
+# create new dataset from fred with only columns 'Plant taxonomy_Accepted genus_TPL', 'Specific root length (SRL)', 'Root tissue density (RTD)', 'Root diameter', 'Root N content'
+
+```{r}
+fred3 <- fred %>%
+  select(`Plant taxonomy_Accepted genus_TPL`, `Specific root length (SRL)`, `Root tissue density (RTD)`, `Root diameter`, `Root N content`, `Plant woodiness_TRY`) %>%
+  rename(genus = `Plant taxonomy_Accepted genus_TPL`, srl = `Specific root length (SRL)`, rtd = `Root tissue density (RTD)`, rd = `Root diameter`, rnc = `Root N content`, woodiness = `Plant woodiness_TRY`)
+```
+
+# refactor woodiness to woody = 1, non-woody = 0
+
+```{r}
+fred3$woodiness <- ifelse(fred3$woodiness == "woody", 1, 0)
+```
+
+
+
+# create a dataset with genus by mean 'Specific root length (SRL)', 'Root tissue density (RTD)', 'Root diameter', 'Root N content'
+```{r}
+fred3$srl <- as.numeric(fred3$srl)
+fred3$rtd <- as.numeric(fred3$rtd)
+fred3$rd <- as.numeric(fred3$rd)
+fred3$rnc <- as.numeric(fred3$rnc)
+fred_genus <- fred3 %>%
+  group_by(genus) %>%
+  summarise(mean_srl = mean(srl, na.rm = TRUE),
+            mean_rtd = mean(rtd, na.rm = TRUE),
+            mean_rd = mean(rd, na.rm = TRUE),
+            mean_rnc = mean(rnc, na.rm = TRUE),
+            mean_woody = mean(woodiness, na.rm=TRUE)) %>%
+  arrange(desc(mean_srl))
+```
+# boxplots of 'srl', 'rtd', 'rd', 'rnc' by genus. omit NA values
+```{r}
+p1 <- ggplot(fred3[fred3$srl>0,], aes(x = genus, y = srl)) +
+  geom_boxplot() +
+  labs(x = "Genus", y = "Specific root length (SRL)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+p2 <- ggplot(fred3[fred3$srl>0,], aes(x = genus, y = rtd)) +
+  geom_boxplot() +
+  labs(x = "Genus", y = "Root tissue density (RTD)") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+p3 <- ggplot(fred3[fred3$srl>0,], aes(x = genus, y = rd)) +
+  geom_boxplot() +
+  labs(x = "Genus", y = "Root diameter") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+p4 <- ggplot(fred3[fred3$srl>0,], aes(x = genus, y = rnc)) +
+  geom_boxplot() +
+  labs(x = "Genus", y = "Root N content") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+# arrange boxplots in a grid
+p5 <- grid.arrange(p1, p2, p3, p4, ncol = 2)
+# save boxplots as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/genus_srl_rtd_rd_rnc.jpg", plot = p5, width = 45, height = 30, units = "cm")
+```
+
+# import maarjam_genus
+
+```{r}
+maarjam_genus <- read.csv("C:/Users/pcadmin/Nextcloud/FredAMF/maarjam_genus.csv", sep=";")
+```
+
+# count unique genus in maarjam_genus
+
+```{r}
+unique_maarjam_genus <- unique(maarjam_genus$genus)
+#451
+```
+
+# count unique genus in fred_genus
+
+```{r}
+unique_fred_genus <- unique(fred_genus$genus)
+# 136
+```
+
+# see how many unique genus overlap with maarjam_genus
+```{r}
+overlap_genus <- unique_fred_genus[unique_fred_genus %in% unique_maarjam_genus]
+length(overlap_genus)
+# 124
+```
+# keep only genus from overlap in fred_genus
+```{r}
+fred_genus <- fred_genus[fred_genus$genus %in% overlap_genus,]
+```
+
+# keep only overlapping genus in maajram
+
+```{r}
+maarjam_genus <- maarjam_genus[maarjam_genus$genus %in% overlap_genus,]
+```
+
+# make lists of virtTaxon for each genus in maarjam_genus
+
+```{r}
+maarjam_genus_virtTaxon <- maarjam_genus %>%
+  group_by(genus) %>%
+  summarise(virtTaxon = paste(unique(virtTaxon), collapse = ", ")) %>%
+  arrange(genus)
+```
+
+# split maarjam_genus_virtTaxon$virtTaxon into separate columns
+
+```{r}
+maarjam_genus_virtTaxon <- maarjam_genus_virtTaxon %>%
+  separate(virtTaxon, into = paste0("virtTaxon", 1:148), sep = ", ", fill = "right", extra = "drop")
+```
+
+# replace NULL with NA
+```{r}
+maarjam_genus_virtTaxon[maarjam_genus_virtTaxon == "NULL"] <- NA
+```
+
+# write csv file with maarjam_genus_virtTaxon
+```{r}
+write.csv(maarjam_genus_virtTaxon, "C:/Users/pcadmin/Nextcloud/FredAMF/maarjam_genus_virtTaxon.csv", row.names = FALSE)
+```
+
+# make a list of all virtTaxon in maarjam_genus_virtTaxon
+
+```{r}
+unique_virtTaxon_genus <- unique(unlist(maarjam_genus_virtTaxon[2:149]))
+unique_virtTaxon_genus <- as.factor(unique_virtTaxon_genus)
+```
+
+# write csv file with unique_virtTaxon_genus
+```{r}
+write.csv(unique_virtTaxon_genus, "C:/Users/pcadmin/Nextcloud/FredAMF/unique_virtTaxon_genus.csv", row.names = FALSE)
+```
+
+# import genus_presabs.csv
+
+```{r}
+genus_presabs <- read.csv("C:/Users/pcadmin/Nextcloud/FredAMF/genus_presabs.csv", sep=";")
+```
+
+# calculate rowsums and make new column called richness
+
+```{r}
+genus_presabs$richness <- rowSums(genus_presabs[2:149], na.rm = TRUE)
+```
+
+# merge genus_presabs with fred_genus
+```{r}
+richness_genus <- merge(fred_genus, genus_presabs, by.x = "genus", by.y = "genus")
+richness_genus <- richness_genus %>%
+  arrange(desc(richness))
+```
+
+# plot richness vs
+
+```{r}
+p1 <- ggplot(richness_genus, aes(x = richness, y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean SRL") +
+  theme_minimal()
+
+p2 <- ggplot(richness_genus, aes(x = richness, y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean RTD") +
+  theme_minimal()
+
+p3 <- ggplot(richness_genus, aes(x = richness, y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean RD") +
+  theme_minimal()
+
+p4 <- ggplot(richness_genus, aes(x = richness, y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean RNC") +
+  theme_minimal()
+
+p5 <- grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/richness_genus_srl_rtd_rd_rnc.jpg", plot = p5, width = 35, height = 25, units = "cm")
+```
+
+# plot prop_cult vs srl rtd rd rnc
+```{r}
+p1 <- ggplot(richness_genus, aes(x = logit(prop_cult), y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-2, 1) +
+  labs(x = "logit Prop. cultured vt", y = "Mean SRL") +
+  theme_minimal()
+p2 <- ggplot(richness_genus, aes(x = logit(prop_cult), y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-2, 1) +
+  labs(x = "logit Prop. cultured vt", y = "Mean RTD") +
+  theme_minimal()
+p3 <- ggplot(richness_genus, aes(x = logit(prop_cult), y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-2, 1) +
+  labs(x = "logit Prop. cultured vt", y = "Mean RD") +
+  theme_minimal()
+p4 <- ggplot(richness_genus, aes(x = logit(prop_cult), y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-2, 1) +
+  labs(x = "logit Prop. cultured vt", y = "Mean RNC") +
+  theme_minimal()
+p5 <- grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/prop_cult_genus_srl_rtd_rd_rnc.jpg", plot = p5, width = 20, height = 15, units = "cm")
+```
+
+# plot prop_rhiz vs srl rtd rd rnc. omit where prop_rhiz is 0
+
+```{r}
+p1 <- ggplot(richness_genus[richness_genus$prop_rhiz > 0, ], aes(x = logit(prop_rhiz), y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. rhizophilic vt", y = "Mean SRL") +
+  theme_minimal()
+p2 <- ggplot(richness_genus[richness_genus$prop_rhiz > 0, ], aes(x = logit(prop_rhiz), y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. rhizophilic vt", y = "Mean RTD") +
+  theme_minimal()
+p3 <- ggplot(richness_genus[richness_genus$prop_rhiz > 0, ], aes(x = logit(prop_rhiz), y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. rhizophilic vt", y = "Mean RD") +
+  theme_minimal()
+p4 <- ggplot(richness_genus[richness_genus$prop_rhiz > 0, ], aes(x = logit(prop_rhiz), y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "logit Prop. rhizophilic vt", y = "Mean RNC") +
+  theme_minimal()
+
+p5 <- grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+  
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/prop_rhiz_genus_srl_rtd_rd_rnc.jpg", plot = p5, width = 20, height = 15, units = "cm")
+```
+
+# plot prop_edap vs srl rtd rd rnc. omit where prop_edap is 0
+```{r}
+p1 <- ggplot(richness_genus[richness_genus$prop_edap > 0, ], aes(x = logit(prop_edap), y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-4, -1.5) +
+  labs(x = "logit Prop. edaphophilic vt", y = "Mean SRL") +
+  theme_minimal()
+p2 <- ggplot(richness_genus[richness_genus$prop_edap > 0, ], aes(x = logit(prop_edap), y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-4, -1.5) +
+  labs(x = "logit Prop. edaphophilic vt", y = "Mean RTD") +
+  theme_minimal()
+p3 <- ggplot(richness_genus[richness_genus$prop_edap > 0, ], aes(x = logit(prop_edap), y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-4, -1.5) +
+  labs(x = "logit Prop. edaphophilic vt", y = "Mean RD") +
+  theme_minimal()
+p4 <- ggplot(richness_genus[richness_genus$prop_edap > 0, ], aes(x = logit(prop_edap), y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-4, -1.5) +
+  labs(x = "logit Prop. edaphophilic vt", y = "Mean RNC") +
+  theme_minimal()
+p5 <- grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/prop_edap_genus_srl_rtd_rd_rnc.jpg", plot = p5, width = 20, height = 15, units = "cm")
+```
+
+# plot prop_anc vs srl rtd rd rnc. omit where prop_anc is 0
+
+```{r}
+p1 <- ggplot(richness_genus[richness_genus$prop_anc > 0, ], aes(x = logit(prop_anc), y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-4, -1.5) +
+  labs(x = "logit Prop. ancestral vt", y = "Mean SRL") +
+  theme_minimal()
+p2 <- ggplot(richness_genus[richness_genus$prop_anc > 0, ], aes(x = logit(prop_anc), y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-4, -1.5) +
+  labs(x = "logit Prop. ancestral vt", y = "Mean RTD") +
+  theme_minimal()
+p3 <- ggplot(richness_genus[richness_genus$prop_anc > 0, ], aes(x = logit(prop_anc), y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-4, -1.5) +
+  labs(x = "logit Prop. ancestral vt", y = "Mean RD") +
+  theme_minimal()
+p4 <- ggplot(richness_genus[richness_genus$prop_anc > 0, ], aes(x = logit(prop_anc), y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlim(-4, -1.5) +
+  labs(x = "logit Prop. ancestral vt", y = "Mean RNC") +
+  theme_minimal()
+
+p5 <- grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+# save p5 as 30x30 cm png
+```{r}
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/prop_anc_genus_srl_rtd_rd_rnc.jpg", plot = p5, width = 20, height = 15, units = "cm")
+```
+
+# PCA of richness_genus with na.omit
+
+```{r}
+roots_st <- scale(fred3[, c("srl", "rtd", "rd", "rnc", "woodiness")])
+roots_pca <- prcomp(na.omit(roots_st), scale. = FALSE, center = FALSE)
+summary(roots_pca)
+pca_fig<-fviz_pca_biplot(roots_pca,
+label = "var", repel = TRUE)
+#save roots_pca as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/roots_pca.jpg", plot = pca_fig, width = 15, height = 15, units = "cm")
+```
+  
+# separate richness_genus into two datasets based on mean_woody = 0 and >0
+```{r}
+richness_genus_woody <- richness_genus[richness_genus$mean_woody > 0, ]
+richness_genus_nonwoody <- richness_genus[richness_genus$mean_woody == 0, ]
+```
+
+# PCA of richness_genus with na.omit
+
+```{r}
+roots_st <- scale(fred3[, c("srl", "rtd", "rd", "rnc")])
+roots_pca <- prcomp(na.omit(roots_st), scale. = FALSE, center = FALSE)
+summary(roots_pca)
+pca_fig<-fviz_pca_biplot(roots_pca,
+label = "var", repel = TRUE)
+#save roots_pca as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/roots_pca_4way.jpg", plot = pca_fig, width = 15, height = 15, units = "cm")
+```
+# pca in richness_genus_woody and richness_genus_nonwoody
+
+```{r}
+roots_st_woody <- scale(richness_genus_woody[, c("mean_srl", "mean_rtd", "mean_rd", "mean_rnc")])
+roots_pca_woody <- prcomp(na.omit(roots_st_woody), scale. = FALSE, center = FALSE)
+summary(roots_pca_woody)
+pca_fig_woody <- fviz_pca_biplot(roots_pca_woody,
+label = "var", repel = TRUE) +
+  labs(title = "PCA of woody genera")
+#save roots_pca_woody as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/roots_pca_woody.jpg", plot = pca_fig_woody, width = 15, height = 15, units = "cm")
+```
+
+```{r}
+roots_st_nonwoody <- scale(richness_genus_nonwoody[, c("mean_srl", "mean_rtd", "mean_rd", "mean_rnc")])
+roots_pca_nonwoody <- prcomp(na.omit(roots_st_nonwoody), scale. = FALSE, center = FALSE)
+summary(roots_pca_nonwoody)
+pca_fig_nonwoody <- fviz_pca_biplot(roots_pca_nonwoody,
+label = "var", repel = TRUE) +
+  labs(title = "PCA of non-woody genera")
+#save roots_pca_nonwoody as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/roots_pca_nonwoody.jpg", plot = pca_fig_nonwoody, width = 15, height = 15, units = "cm")
+```
+
+# plot richness vs srl rtd rd rnc for woody and non-woody separately
+
+```{r}
+p1_woody <- ggplot(richness_genus_woody, aes(x = richness, y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean SRL") +
+  theme_minimal()
+p2_woody <- ggplot(richness_genus_woody, aes(x = richness, y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean RTD") +
+  theme_minimal()
+p3_woody <- ggplot(richness_genus_woody, aes(x = richness, y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean RD") +
+  theme_minimal()
+p4_woody <- ggplot(richness_genus_woody, aes(x = richness, y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean RNC") +
+  theme_minimal()
+p5_woody <- grid.arrange(p1_woody, p2_woody, p3_woody, p4_woody, ncol = 2)
+# save p5_woody as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/richness_genus_woody_srl_rtd_rd_rnc.jpg", plot = p5_woody, width = 15, height = 15, units = "cm")
+```
+
+```{r}
+p1_nonwoody <- ggplot(richness_genus_nonwoody, aes(x = richness, y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean SRL") +
+  theme_minimal()
+p2_nonwoody <- ggplot(richness_genus_nonwoody, aes(x = richness, y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean RTD") +
+  theme_minimal()
+p3_nonwoody <- ggplot(richness_genus_nonwoody, aes(x = richness, y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean RD") +
+  theme_minimal()
+p4_nonwoody <- ggplot(richness_genus_nonwoody, aes(x = richness, y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_text(aes(label = genus), hjust = 0.5, vjust = -0.5, size = 3) +
+  xlim(0, 90) +
+  labs(x = "VT richness", y = "Mean RNC") +
+  theme_minimal()
+p5_nonwoody <- grid.arrange(p1_nonwoody, p2_nonwoody, p3_nonwoody, p4_nonwoody, ncol = 2)
+# save p5_nonwoody as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/richness_genus_nonwoody_srl_rtd_rd_rnc.jpg", plot = p5_nonwoody, width = 15, height = 15, units = "cm")
+```
+# import FR_species.csv (FungalRoot)
+
+```{r}
+fr_species <- read.csv("C:/Users/pcadmin/Nextcloud/FredAMF/FR_species.csv", sep=",")
+```
+# filter to have only rows where mean_col is not NA
+
+```{r}
+fr_species <- fr_species %>%
+  filter(!is.na(mean_col))
+```
+
+# create new dataset from fred with only columns 'Plant taxonomy_Accepted species_TPL', 'Specific root length (SRL)', 'Root tissue density (RTD)', 'Root diameter', 'Root N content'
+
+```{r}
+fred4 <- fred %>%
+  select(`Plant Taxonomy_Accepted species_TPL`,`Plant taxonomy_Accepted genus_TPL`, `Specific root length (SRL)`, `Root tissue density (RTD)`, `Root diameter`, `Root N content`, `Plant woodiness_TRY`) %>%
+  rename(species = `Plant Taxonomy_Accepted species_TPL`, genus = `Plant taxonomy_Accepted genus_TPL`, srl = `Specific root length (SRL)`, rtd = `Root tissue density (RTD)`, rd = `Root diameter`, rnc = `Root N content`, woodiness = `Plant woodiness_TRY`)
+```
+
+# combine columns genus and species in fred4
+
+```{r}
+fred4$species <- paste(fred4$genus, fred4$species, sep = " ")
+fred4 <- fred4 %>%
+  select(species, srl, rtd, rd, rnc, woodiness)
+```
+
+# merge fred4 with fr_species by species
+
+```{r}
+richness_fr_species <- merge(fred4, fr_species, by.x = "species", by.y = "species")
+richness_fr_species$srl <- as.numeric(richness_fr_species$srl)
+richness_fr_species$rtd <- as.numeric(richness_fr_species$rtd)
+richness_fr_species$rd <- as.numeric(richness_fr_species$rd)
+richness_fr_species$rnc <- as.numeric(richness_fr_species$rnc)
+richness_fr_species$mean_col <- as.numeric(richness_fr_species$mean_col)
+richness_fr_species$woodiness <- ifelse(richness_fr_species$woodiness == "woody", 1, 0)
+richness_fr_species <- richness_fr_species %>%
+  select(species, srl, rtd, rd, rnc, woodiness, mean_col)
+```
+
+# mean by species for 'srl', 'rtd', 'rd', 'rnc' and mean_col
+
+```{r}
+richness_fr_species <- richness_fr_species %>%
+  group_by(species) %>%
+  summarise(mean_srl = mean(srl, na.rm = TRUE),
+            mean_rtd = mean(rtd, na.rm = TRUE),
+            mean_rd = mean(rd, na.rm = TRUE),
+            mean_rnc = mean(rnc, na.rm = TRUE),
+            mean_col = mean(mean_col, na.rm = TRUE),
+            mean_woody = mean(woodiness,na.rm=TRUE)) %>%
+  arrange(desc(mean_col))
+```
+
+# plot mean_col vs srl rtd rd rnc
+
+```{r}
+p1 <- ggplot(richness_fr_species, aes(x = mean_col, y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean SRL") +
+  theme_minimal()
+p2 <- ggplot(richness_fr_species, aes(x = mean_col, y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean RTD") +
+  theme_minimal()
+p3 <- ggplot(richness_fr_species, aes(x = mean_col, y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean RD") +
+  theme_minimal()
+p4 <- ggplot(richness_fr_species, aes(x = mean_col, y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean RNC") +
+  theme_minimal()
+p5 <- grid.arrange(p1, p2, p3, p4, ncol = 2)
+# save p5 as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/richness_fr_species_srl_rtd_rd_rnc.jpg", plot = p5, width = 20, height = 15, units = "cm")
+```
+
+# separate woody and non-woody species
+
+```{r}
+richness_fr_species_woody <- richness_fr_species[richness_fr_species$mean_woody > 0, ]
+richness_fr_species_nonwoody <- richness_fr_species[richness_fr_species$mean_woody == 0, ]
+```
+
+# plot mean_col vs srl rtd rd rnc for woody species
+
+```{r}
+p1_woody <- ggplot(richness_fr_species_woody, aes(x = mean_col, y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean SRL") +
+  theme_minimal()
+p2_woody <- ggplot(richness_fr_species_woody, aes(x = mean_col, y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean RTD") +
+  theme_minimal()
+p3_woody <- ggplot(richness_fr_species_woody, aes(x = mean_col, y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean RD") +
+  theme_minimal()
+p4_woody <- ggplot(richness_fr_species_woody, aes(x = mean_col, y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean RNC") +
+  theme_minimal()
+p5_woody <- grid.arrange(p1_woody, p2_woody, p3_woody, p4_woody, ncol = 2)
+# save p5_woody as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/richness_fr_species_woody_srl_rtd_rd_rnc.jpg", plot = p5_woody, width = 20, height = 15, units = "cm")
+```
+```{r}
+p1_nonwoody <- ggplot(richness_fr_species_nonwoody, aes(x = mean_col, y = mean_srl)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean SRL") +
+  theme_minimal()
+p2_nonwoody <- ggplot(richness_fr_species_nonwoody, aes(x = mean_col, y = mean_rtd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean RTD") +
+  theme_minimal()
+p3_nonwoody <- ggplot(richness_fr_species_nonwoody, aes(x = mean_col, y = mean_rd)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean RD") +
+  theme_minimal()
+p4_nonwoody <- ggplot(richness_fr_species_nonwoody, aes(x = mean_col, y = mean_rnc)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  labs(x = "Mean col%", y = "Mean RNC") +
+  theme_minimal()
+p5_nonwoody <- grid.arrange(p1_nonwoody, p2_nonwoody, p3_nonwoody, p4_nonwoody, ncol = 2)
+# save p5_nonwoody as 30x30 cm png
+ggsave("C:/Users/pcadmin/Nextcloud/FredAMF/richness_fr_species_nonwoody_srl_rtd_rd_rnc.jpg", plot = p5_nonwoody, width = 20, height = 15, units = "cm")
+```
+
+# count nr of unique plant_species in ecobank
+```{r}
+unique_ecobank_species <- unique(ecobank$plant_species)
+length(unique_ecobank_species)
+```
