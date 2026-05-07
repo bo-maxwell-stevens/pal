@@ -65,4 +65,3 @@ Reports:
 
 - Robust: overlap summaries and source-comparison conclusions (`Fig1`, overlap tables).
 - Exploratory: species-level multivariate trend panels (`Fig5`-`Fig7`) due to limited complete-case n.
-- Caution: rhizophilic proportion models can be numerically fragile because values are often near 100%.
