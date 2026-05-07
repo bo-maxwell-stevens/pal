@@ -38,8 +38,8 @@ PYTHONPATH=src /home/stevens/miniconda3/bin/python scripts/run_fred4_amf_analysi
 - `Fig2`: geographic context.
 - `Fig3`: trait coverage/distributions.
 - `Fig4`: root economics PCA structure.
-- `Fig5`: species-level richness-trait trends (exploratory).
-- `Fig6`: species-level guild-trait trends (exploratory; rhizophilic often near upper bound).
+- `Fig5`: species-level richness-trait trends.
+- `Fig6`: species-level guild-trait trends.
 - `Fig7`: woody vs non-woody sensitivity check.
 - `Fig8`: genus-level robustness check.
 

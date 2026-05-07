@@ -37,8 +37,8 @@ Figure interpretation summary:
 - Species-level models: `/home/stevens/projects/pal/Output/Tables/species_level_model_summaries.csv`
 - Genus-level models: `/home/stevens/projects/pal/Output/Tables/genus_level_model_summaries.csv`
 
-## Caveats
-- FRED trait values and AMF observations are not necessarily co-located.
+## Data and model notes
+- FRED trait values and AMF observations are integrated at taxon level and are not necessarily co-located.
 - Root N and Root P can be strongly environmentally variable.
 - Root traits are partly phylogenetically conserved.
 - Genus-level aggregation increases overlap but adds trait heterogeneity.

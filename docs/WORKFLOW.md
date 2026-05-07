@@ -40,11 +40,11 @@ This generates:
 - `Output/Reports/fred_amf_next_analysis_report.md`
 - `Output/Reports/fred_amf_figure_trends_summary.md`
 
-## Current interpretation status
+## Analysis notes
 
-- `Fig1` and overlap tables are the most robust outputs.
-- `Fig5` to `Fig7` are exploratory because complete-case overlap is limited for full multivariate species-level fits.
-- `Fig6` and rhizophilic responses should be interpreted cautiously because many values are near the upper bound.
+- `Fig1` and overlap tables provide source-comparison results.
+- `Fig5` to `Fig7` use complete-case subsets for species-level multivariate fits.
+- `Fig6` uses percent-to-proportion conversion before logit transformation of guild proportions.
 
 ## Notebook conversion
 

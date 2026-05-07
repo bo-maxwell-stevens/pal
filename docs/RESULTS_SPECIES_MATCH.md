@@ -26,7 +26,7 @@ For broader context and downstream interpretation, see:
 - The new full FRED has the largest species coverage and gives the highest exact match counts for both datasets.
 - Relative gain is substantial vs the previously used filtered files.
 - `FRED3_fineRoots.csv` still performs well despite being much smaller, likely because of overlap in sampled taxa.
-- The current pipeline uses strict canonical binomials; counts may differ from earlier exploratory runs that retained non-binomial names.
+- The current pipeline uses strict canonical binomials; counts may differ from earlier runs that retained non-binomial names.
 
 ## Likely (non-exact) matches
 

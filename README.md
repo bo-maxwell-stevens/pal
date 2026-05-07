@@ -61,7 +61,7 @@ Reports:
 - `Output/Reports/fred_amf_next_analysis_report.md`
 - `Output/Reports/fred_amf_figure_trends_summary.md`
 
-## Current Interpretation Status
+## Analysis Notes
 
-- Robust: overlap summaries and source-comparison conclusions (`Fig1`, overlap tables).
-- Exploratory: species-level multivariate trend panels (`Fig5`-`Fig7`) due to limited complete-case n.
+- Overlap summaries and source-comparison results are reported in `Fig1` and `Output/Tables/fred_amf_species_overlap_summary.csv`.
+- Species-level multivariate panels (`Fig5`-`Fig7`) are based on complete-case subsets.
